@@ -46,11 +46,11 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
           
           <div className="flex items-center space-x-2 text-xs">
             <span className="text-slate-500">QUERY:</span>
-            <span className="text-green-400 font-bold px-1.5 py-0.2 bg-green-950/60 border border-green-800">
+            <span className="terminal-badge terminal-badge-green">
               "{query || 'ALL'}"
             </span>
             <span className="text-slate-600">•</span>
-            <span className="text-slate-300 bg-neutral-900 px-1.5 py-0.2 border border-neutral-800">
+            <span className="terminal-badge">
               TOPIC: {topic}
             </span>
           </div>
@@ -58,7 +58,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
       </div>
 
       {/* Filter Results Summary Box */}
-      <div className="bg-[#121212] border border-neutral-800 p-4">
+      <div className="terminal-card">
         <div className="border-b border-neutral-800 pb-2 mb-3">
           <h2 className="text-xs font-bold text-slate-100 uppercase tracking-wider">
             FILTERED_TALKS_SUMMARY ({filteredTalks.length})
@@ -66,7 +66,7 @@ export const SearchResultsView: React.FC<SearchResultsViewProps> = ({
         </div>
 
         {filteredTalks.length === 0 ? (
-          <div className="p-4 text-center text-xs text-slate-500">
+          <div className="terminal-empty-state">
             [NO DATA YET — RUN THE COLLECTOR TO POPULATE THIS VIEW]
           </div>
         ) : (

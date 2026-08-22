@@ -10,7 +10,7 @@ export const TalkCards: React.FC<TalkCardsProps> = ({ talks }) => {
 
   if (!talks || talks.length === 0) {
     return (
-      <div className="bg-[#121212] border border-neutral-800 p-6 text-center text-xs font-mono text-slate-500">
+      <div className="terminal-empty-state">
         [NO DATA YET — RUN THE COLLECTOR TO POPULATE THIS VIEW]
       </div>
     );
@@ -59,14 +59,14 @@ export const TalkCards: React.FC<TalkCardsProps> = ({ talks }) => {
         {filteredTalks.map((talk, idx) => (
           <div
             key={idx}
-            className="bg-[#121212] border border-neutral-800 p-3 transition-colors hover:border-neutral-700"
+            className="terminal-card terminal-card-hover"
           >
             {/* Top Row: Conference & Topic */}
             <div className="flex items-center justify-between mb-1 text-xs">
-              <span className="px-1.5 py-0.2 bg-neutral-900 text-slate-300 border border-neutral-700 font-bold">
+              <span className="terminal-badge">
                 [{talk.conference_name}]
               </span>
-              <span className="text-[10px] text-green-400 bg-green-950/40 px-1.5 py-0.2 border border-green-800">
+              <span className="terminal-badge terminal-badge-green">
                 TOPIC: {talk.topic}
               </span>
             </div>

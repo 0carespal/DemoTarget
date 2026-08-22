@@ -9,9 +9,9 @@ interface TopicDistributionChartProps {
 export const TopicDistributionChart: React.FC<TopicDistributionChartProps> = ({ talks }) => {
   if (!talks || talks.length === 0) {
     return (
-      <div className="bg-[#121212] border border-neutral-800 p-4 h-full flex flex-col justify-center items-center text-center font-mono">
+      <div className="terminal-card flex flex-col justify-center items-center h-full min-h-[220px]">
         <div className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">TOPIC_DISTRIBUTION</div>
-        <div className="text-xs text-slate-500">
+        <div className="terminal-empty-state border-none p-0 bg-transparent">
           [NO DATA YET — RUN THE COLLECTOR TO POPULATE THIS VIEW]
         </div>
       </div>
@@ -35,15 +35,15 @@ export const TopicDistributionChart: React.FC<TopicDistributionChartProps> = ({ 
   }));
 
   return (
-    <div className="bg-[#121212] border border-neutral-800 p-3 flex flex-col justify-between h-full font-mono">
+    <div className="terminal-card flex flex-col justify-between h-full font-mono">
       {/* Card Header */}
       <div className="flex items-center justify-between border-b border-neutral-800 pb-2 mb-3 text-xs">
         <div>
           <h3 className="font-bold text-slate-100 uppercase tracking-wider">TOPIC_DISTRIBUTION</h3>
           <p className="text-[10px] text-slate-400">Derived from data_reports/talks.json</p>
         </div>
-        <span className="text-[10px] font-mono bg-neutral-900 px-2 py-0.5 text-slate-300 border border-neutral-800">
-          {total} RECS
+        <span className="terminal-badge">
+          [{total} RECS]
         </span>
       </div>
 

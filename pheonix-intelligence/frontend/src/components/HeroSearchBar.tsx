@@ -29,7 +29,7 @@ export const HeroSearchBar: React.FC<HeroSearchBarProps> = ({
   return (
     <div className="w-full py-2 font-mono">
       <div className="max-w-4xl mx-auto">
-        <form onSubmit={handleSubmit} className="bg-[#121212] border border-neutral-800 p-3">
+        <form onSubmit={handleSubmit} className="terminal-card">
           {/* Topic Filters derived only from real data */}
           {availableTopics.length > 1 && (
             <div className="flex items-center space-x-1 overflow-x-auto pb-2 border-b border-neutral-800 mb-2.5">

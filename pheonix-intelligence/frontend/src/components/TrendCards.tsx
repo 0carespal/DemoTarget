@@ -8,7 +8,7 @@ interface TrendCardsProps {
 export const TrendCards: React.FC<TrendCardsProps> = ({ talks }) => {
   if (!talks || talks.length === 0) {
     return (
-      <div className="bg-[#121212] border border-neutral-800 p-4 text-center text-xs font-mono text-slate-500">
+      <div className="terminal-empty-state">
         [NO DATA YET — RUN THE COLLECTOR TO POPULATE THIS VIEW]
       </div>
     );
@@ -28,14 +28,14 @@ export const TrendCards: React.FC<TrendCardsProps> = ({ talks }) => {
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 font-mono">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
       {realMetrics.map((item, idx) => (
         <div
           key={idx}
-          className="bg-[#121212] border border-neutral-800 p-3 relative group transition-colors hover:border-neutral-700"
+          className="terminal-card terminal-card-hover relative"
         >
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-neutral-900 text-slate-300 border border-neutral-800">
+            <span className="terminal-badge">
               [{item.category}]
             </span>
           </div>
