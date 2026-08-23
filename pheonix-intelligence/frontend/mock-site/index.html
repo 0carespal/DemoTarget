@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Tech Conference Schedule</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+      margin: 0;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      margin-top: 0;
+      color: #1a202c;
+    }
+    .version-info {
+      background-color: #edf2f7;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      margin-bottom: 1.5rem;
+      font-size: 0.9rem;
+    }
+    .version-toggle {
+      margin-top: 0.5rem;
+    }
+    .version-toggle a {
+      margin-right: 1rem;
+      color: #3182ce;
+      text-decoration: none;
+      font-weight: bold;
+    }
+    .version-toggle a:hover {
+      text-decoration: underline;
+    }
+
+    /* Version A styles */
+    .session-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      background-color: #faf5ff;
+    }
+    .talk-title {
+      margin: 0 0 0.5rem 0;
+      color: #4a5568;
+      font-size: 1.2rem;
+    }
+    .speaker, .conf-name, .track-label {
+      display: inline-block;
+      margin-right: 1rem;
+      font-size: 0.9rem;
+    }
+    .speaker { color: #2b6cb0; font-weight: 600; }
+    .conf-name { color: #718096; }
+    .track-label {
+      background-color: #e9d8fd;
+      color: #553c9a;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+
+    /* Version B styles */
+    .talk-item {
+      border-left: 4px solid #319795;
+      background-color: #f0fff4;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      border-radius: 0 6px 6px 0;
+    }
+    .session-name {
+      margin: 0 0 0.5rem 0;
+      font-weight: bold;
+      font-size: 1.15rem;
+      color: #234e52;
+    }
+    .presenter, .event-name, .category {
+      display: inline-block;
+      margin-right: 1rem;
+      font-size: 0.9rem;
+    }
+    .presenter { color: #2c7a7b; font-weight: 600; }
+    .event-name { color: #4a5568; font-style: italic; }
+    .category {
+      background-color: #c6f6d5;
+      color: #22543d;
+      padding: 0.2rem 0.5rem;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Tech Conference Schedule (Mock Site)</h1>
+    <div class="version-info">
+      <div>Active Layout Version: <strong id="version-display"></strong></div>
+      <div class="version-toggle">
+        Toggle version: 
+        <a href="?version=A">Version A</a>
+        <a href="?version=B">Version B</a>
+      </div>
+    </div>
+
+    <div id="talks-container"></div>
+  </div>
+
+  <script>
+    const talksData = [
+      {
+        title: "Scaling LLM Inference Infrastructure with Speculative Decoding",
+        speaker: "Dr. Aris Vance",
+        confName: "AI Systems Summit 2026",
+        topic: "AI Infrastructure"
+      },
+      {
+        title: "Zero-Trust Architecture for Cloud-Native Microservices",
+        speaker: "Elena Rostova",
+        confName: "CloudSec Global 2026",
+        topic: "Cybersecurity"
+      },
+      {
+        title: "Optimizing Vector Database Indexing at Petabyte Scale",
+        speaker: "Marcus Chen",
+        confName: "DataEng World 2026",
+        topic: "Data Engineering"
+      },
+      {
+        title: "Autonomous AI Agents in Production: Pitfalls and Patterns",
+        speaker: "Sophia Patel",
+        confName: "DevCon AI 2026",
+        topic: "Artificial Intelligence"
+      },
+      {
+        title: "WebAssembly Edge Runtimes for Distributed Applications",
+        speaker: "Liam O'Connor",
+        confName: "Edge Computing Con 2026",
+        topic: "Distributed Systems"
+      }
+    ];
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const paramVersion = urlParams.get('version');
+    const version = (paramVersion && paramVersion.toUpperCase() === 'B') ? 'B' : 'A';
+
+    document.getElementById('version-display').textContent = version;
+
+    const container = document.getElementById('talks-container');
+
+    talksData.forEach(talk => {
+      if (version === 'A') {
+        const card = document.createElement('div');
+        card.className = 'session-card';
+        card.innerHTML = `
+          <h3 class="talk-title">${talk.title}</h3>
+          <span class="speaker">${talk.speaker}</span>
+          <span class="conf-name">${talk.confName}</span>
+          <span class="track-label">${talk.topic}</span>
+        `;
+        container.appendChild(card);
+      } else {
+        const item = document.createElement('div');
+        item.className = 'talk-item';
+        item.innerHTML = `
+          <p class="session-name">${talk.title}</p>
+          <span class="presenter">${talk.speaker}</span>
+          <span class="event-name">${talk.confName}</span>
+          <span class="category">${talk.topic}</span>
+        `;
+        container.appendChild(item);
+      }
+    });
+  </script>
+</body>
+</html>
