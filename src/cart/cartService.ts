@@ -1,5 +1,64 @@
-import { CartItem, CartSummary, Discount, ShoppingCartOptions } from './types';
+import {
+  CartItem,
+  CartSummary,
+  Discount,
+  DiscountStrategy,
+  DiscountType,
+  ShoppingCartOptions,
+} from './types';
 import { Validator } from '../validation/validator';
+
+/**
+ * Strategy implementation for calculating percentage-based discounts.
+ */
+export class PercentageDiscountStrategy implements DiscountStrategy {
+  readonly type: DiscountType = 'percentage';
+
+  calculateDiscount(subtotal: number, discount: Discount): number {
+    const val = discount.value ?? discount.percentage ?? 0;
+    return (subtotal * val) / 100;
+  }
+}
+
+/**
+ * Strategy implementation for calculating fixed amount discounts.
+ */
+export class FixedDiscountStrategy implements DiscountStrategy {
+  readonly type: DiscountType = 'fixed';
+
+  calculateDiscount(_subtotal: number, discount: Discount): number {
+    return discount.value ?? 0;
+  }
+}
+
+/**
+ * Registry mapping discount types to their corresponding calculation strategies.
+ * Allows adding new discount strategies (e.g. buy_one_get_one, coupon_expiration) dynamically.
+ */
+export class DiscountStrategyRegistry {
+  private static strategies: Map<string, DiscountStrategy> = new Map();
+
+  static {
+    DiscountStrategyRegistry.registerStrategy(new PercentageDiscountStrategy());
+    DiscountStrategyRegistry.registerStrategy(new FixedDiscountStrategy());
+  }
+
+  /**
+   * Registers a discount calculation strategy.
+   * @param strategy - DiscountStrategy implementation to register
+   */
+  public static registerStrategy(strategy: DiscountStrategy): void {
+    this.strategies.set(strategy.type, strategy);
+  }
+
+  /**
+   * Retrieves the registered strategy for a given discount type.
+   * @param type - DiscountType identifier
+   */
+  public static getStrategy(type: DiscountType): DiscountStrategy | undefined {
+    return this.strategies.get(type);
+  }
+}
 
 /**
  * Calculates the subtotal for a given array of cart items.
@@ -28,7 +87,7 @@ export function calculateSubtotal(items: CartItem[]): number {
 }
 
 /**
- * Applies an array of discounts to a subtotal.
+ * Applies an array of discounts to a subtotal using modular discount strategies.
  *
  * @param subtotal - The base subtotal amount
  * @param discounts - Array of discounts to apply
@@ -50,10 +109,16 @@ export function applyDiscounts(subtotal: number, discounts: Discount[]): number 
       throw new Error('Invalid discount value.');
     }
 
-    if (discount.type === 'percentage') {
-      totalDiscount += (subtotal * discount.value) / 100;
-    } else if (discount.type === 'fixed') {
-      totalDiscount += discount.value;
+    const strategy = DiscountStrategyRegistry.getStrategy(discount.type);
+    if (strategy) {
+      totalDiscount += strategy.calculateDiscount(subtotal, discount);
+    } else {
+      // Fallback for direct built-in discount types
+      if (discount.type === 'percentage') {
+        totalDiscount += (subtotal * discount.value) / 100;
+      } else if (discount.type === 'fixed') {
+        totalDiscount += discount.value;
+      }
     }
   }
 

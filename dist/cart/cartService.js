@@ -1,10 +1,61 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ShoppingCart = void 0;
+exports.ShoppingCart = exports.DiscountStrategyRegistry = exports.FixedDiscountStrategy = exports.PercentageDiscountStrategy = void 0;
 exports.calculateSubtotal = calculateSubtotal;
 exports.applyDiscounts = applyDiscounts;
 exports.calculateTotal = calculateTotal;
 const validator_1 = require("../validation/validator");
+/**
+ * Strategy implementation for calculating percentage-based discounts.
+ */
+class PercentageDiscountStrategy {
+    constructor() {
+        this.type = 'percentage';
+    }
+    calculateDiscount(subtotal, discount) {
+        const val = discount.value ?? discount.percentage ?? 0;
+        return (subtotal * val) / 100;
+    }
+}
+exports.PercentageDiscountStrategy = PercentageDiscountStrategy;
+/**
+ * Strategy implementation for calculating fixed amount discounts.
+ */
+class FixedDiscountStrategy {
+    constructor() {
+        this.type = 'fixed';
+    }
+    calculateDiscount(_subtotal, discount) {
+        return discount.value ?? 0;
+    }
+}
+exports.FixedDiscountStrategy = FixedDiscountStrategy;
+/**
+ * Registry mapping discount types to their corresponding calculation strategies.
+ * Allows adding new discount strategies (e.g. buy_one_get_one, coupon_expiration) dynamically.
+ */
+class DiscountStrategyRegistry {
+    /**
+     * Registers a discount calculation strategy.
+     * @param strategy - DiscountStrategy implementation to register
+     */
+    static registerStrategy(strategy) {
+        this.strategies.set(strategy.type, strategy);
+    }
+    /**
+     * Retrieves the registered strategy for a given discount type.
+     * @param type - DiscountType identifier
+     */
+    static getStrategy(type) {
+        return this.strategies.get(type);
+    }
+}
+exports.DiscountStrategyRegistry = DiscountStrategyRegistry;
+DiscountStrategyRegistry.strategies = new Map();
+(() => {
+    DiscountStrategyRegistry.registerStrategy(new PercentageDiscountStrategy());
+    DiscountStrategyRegistry.registerStrategy(new FixedDiscountStrategy());
+})();
 /**
  * Calculates the subtotal for a given array of cart items.
  *
@@ -28,7 +79,7 @@ function calculateSubtotal(items) {
     return Number(subtotal.toFixed(2));
 }
 /**
- * Applies an array of discounts to a subtotal.
+ * Applies an array of discounts to a subtotal using modular discount strategies.
  *
  * @param subtotal - The base subtotal amount
  * @param discounts - Array of discounts to apply
@@ -46,11 +97,18 @@ function applyDiscounts(subtotal, discounts) {
         if (!discount || typeof discount.value !== 'number' || discount.value < 0) {
             throw new Error('Invalid discount value.');
         }
-        if (discount.type === 'percentage') {
-            totalDiscount += (subtotal * discount.value) / 100;
+        const strategy = DiscountStrategyRegistry.getStrategy(discount.type);
+        if (strategy) {
+            totalDiscount += strategy.calculateDiscount(subtotal, discount);
         }
-        else if (discount.type === 'fixed') {
-            totalDiscount += discount.value;
+        else {
+            // Fallback for direct built-in discount types
+            if (discount.type === 'percentage') {
+                totalDiscount += (subtotal * discount.value) / 100;
+            }
+            else if (discount.type === 'fixed') {
+                totalDiscount += discount.value;
+            }
         }
     }
     return Number(Math.max(0, subtotal - totalDiscount).toFixed(2));
