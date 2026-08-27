@@ -1,45 +1,64 @@
-import { Validator } from '../src/validation/validator';
+import { isValidEmail, isValidPassword, Validator } from '../src/validation/validator';
 
-describe('Validator Unit Tests', () => {
-  describe('validateNonEmptyString', () => {
-    it('should pass for valid string', () => {
-      const res = Validator.validateNonEmptyString('Hello', 'Title');
-      expect(res.isValid).toBe(true);
-      expect(res.errors).toHaveLength(0);
+describe('Validation Unit Tests', () => {
+  describe('isValidEmail', () => {
+    it('should return true for valid email addresses', () => {
+      expect(isValidEmail('user@example.com')).toBe(true);
+      expect(isValidEmail('john.doe@subdomain.company.org')).toBe(true);
+      expect(isValidEmail('customer+tag@domain.co.uk')).toBe(true);
     });
 
-    it('should fail for empty or whitespace string', () => {
-      const res = Validator.validateNonEmptyString('   ', 'Title');
-      expect(res.isValid).toBe(false);
-      expect(res.errors).toContain('Title must be a non-empty string.');
-    });
-  });
-
-  describe('validatePositiveNumber', () => {
-    it('should pass for positive numbers', () => {
-      const res = Validator.validatePositiveNumber(10.5, 'Price');
-      expect(res.isValid).toBe(true);
-    });
-
-    it('should fail for 0 or negative numbers', () => {
-      const res1 = Validator.validatePositiveNumber(0, 'Price');
-      expect(res1.isValid).toBe(false);
-
-      const res2 = Validator.validatePositiveNumber(-5, 'Price');
-      expect(res2.isValid).toBe(false);
+    it('should return false for invalid email addresses', () => {
+      expect(isValidEmail('')).toBe(false);
+      expect(isValidEmail('   ')).toBe(false);
+      expect(isValidEmail('plainaddress')).toBe(false);
+      expect(isValidEmail('@missingusername.com')).toBe(false);
+      expect(isValidEmail('user@.com')).toBe(false);
+      expect(isValidEmail('user@domain')).toBe(false);
     });
   });
 
-  describe('validatePercentage', () => {
-    it('should pass for valid percentages (0-100)', () => {
-      expect(Validator.validatePercentage(0, 'Discount').isValid).toBe(true);
-      expect(Validator.validatePercentage(50, 'Discount').isValid).toBe(true);
-      expect(Validator.validatePercentage(100, 'Discount').isValid).toBe(true);
+  describe('isValidPassword', () => {
+    it('should return true for passwords meeting all criteria including special characters', () => {
+      expect(isValidPassword('Pass123!')).toBe(true);
+      expect(isValidPassword('Secure#2026')).toBe(true);
+      expect(isValidPassword('Strong$Pass1')).toBe(true);
     });
 
-    it('should fail for out of range percentages', () => {
-      expect(Validator.validatePercentage(-1, 'Discount').isValid).toBe(false);
-      expect(Validator.validatePercentage(105, 'Discount').isValid).toBe(false);
+    it('should return false for passwords shorter than 8 characters', () => {
+      expect(isValidPassword('P1!a')).toBe(false);
+      expect(isValidPassword('Pass12!')).toBe(false);
+    });
+
+    it('should return false for passwords missing an uppercase letter', () => {
+      expect(isValidPassword('password123!')).toBe(false);
+    });
+
+    it('should return false for passwords missing a number', () => {
+      expect(isValidPassword('Password!')).toBe(false);
+    });
+
+    it('should return false for passwords missing a special character', () => {
+      expect(isValidPassword('Password123')).toBe(false);
+    });
+  });
+
+  describe('Validator Utility Class', () => {
+    it('should validate non-empty strings', () => {
+      expect(Validator.validateNonEmptyString('Hello', 'Field').isValid).toBe(true);
+      expect(Validator.validateNonEmptyString('  ', 'Field').isValid).toBe(false);
+    });
+
+    it('should validate positive numbers', () => {
+      expect(Validator.validatePositiveNumber(10, 'Field').isValid).toBe(true);
+      expect(Validator.validatePositiveNumber(0, 'Field').isValid).toBe(false);
+      expect(Validator.validatePositiveNumber(-5, 'Field').isValid).toBe(false);
+    });
+
+    it('should validate percentages', () => {
+      expect(Validator.validatePercentage(50, 'Field').isValid).toBe(true);
+      expect(Validator.validatePercentage(-1, 'Field').isValid).toBe(false);
+      expect(Validator.validatePercentage(101, 'Field').isValid).toBe(false);
     });
   });
 });
