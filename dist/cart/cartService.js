@@ -54,7 +54,7 @@ class ShoppingCart {
         if (errors.length > 0) {
             throw new Error(`Invalid discount: ${errors.join(' ')}`);
         }
-        this.discount = { code, percentage };
+        this.discount = { type: 'percentage', value: percentage, code, percentage };
     }
     clearDiscount() {
         this.discount = null;
@@ -69,7 +69,11 @@ class ShoppingCart {
             subtotal += item.price * item.quantity;
             itemCount += item.quantity;
         }
-        const discountPercentage = this.discount ? this.discount.percentage : 0;
+        const discountPercentage = this.discount
+            ? this.discount.type === 'percentage'
+                ? this.discount.value
+                : (this.discount.percentage ?? 0)
+            : 0;
         const discountAmount = Number(((subtotal * discountPercentage) / 100).toFixed(2));
         const taxableSubtotal = Math.max(0, subtotal - discountAmount);
         const taxAmount = Number((taxableSubtotal * this.taxRate).toFixed(2));
