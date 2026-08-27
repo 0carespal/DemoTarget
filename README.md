@@ -1,6 +1,6 @@
 # DemoTarget
 
-A lightweight TypeScript pricing and validation engine used by internal commerce services.
+A lightweight TypeScript pricing and validation engine used by internal commerce services to calculate order totals and validate user input.
 
 ---
 
