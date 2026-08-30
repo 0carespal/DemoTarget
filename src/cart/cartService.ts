@@ -1,203 +1,247 @@
-import {
-  CartItem,
-  Discount,
-  DiscountResult,
-  AppliedDiscount,
-  CartSummary,
-  CartOperationResult,
-} from './types';
+import { CartItem, Discount, DiscountRule, CartSummary, DiscountStrategy } from './types';
+
+export class PercentageDiscountStrategy implements DiscountStrategy {
+  type = 'percentage';
+
+  calculateDiscount(subtotal: number, _items: CartItem[], discount: Discount | DiscountRule): number {
+    const value = ('percentage' in discount && discount.percentage !== undefined)
+      ? discount.percentage
+      : (discount.value ?? discount.percentage ?? 0);
+    if (value <= 0) return 0;
+    const percentage = Math.min(value, 100);
+    return Math.round(subtotal * (percentage / 100) * 100) / 100;
+  }
+}
+
+export class FixedAmountDiscountStrategy implements DiscountStrategy {
+  type = 'fixed';
+
+  calculateDiscount(subtotal: number, _items: CartItem[], discount: Discount | DiscountRule): number {
+    const value = ('amount' in discount && discount.amount !== undefined)
+      ? discount.amount
+      : (discount.value ?? discount.amount ?? 0);
+    if (value <= 0) return 0;
+    return Math.min(value, subtotal);
+  }
+}
+
+export class BulkDiscountStrategy implements DiscountStrategy {
+  type = 'bulk';
+
+  calculateDiscount(subtotal: number, items: CartItem[], discount: Discount | DiscountRule): number {
+    const minQuantity = discount.minQuantity ?? 1;
+    const value = ('discountPercentage' in discount && discount.discountPercentage !== undefined)
+      ? discount.discountPercentage
+      : (discount.value ?? discount.discountPercentage ?? 0);
+    if (value <= 0) return 0;
+
+    let validQuantity = 0;
+    for (const item of items) {
+      if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') continue;
+      if (!isFinite(item.price) || !isFinite(item.quantity)) continue;
+      if (item.price < 0 || item.quantity <= 0) continue;
+      validQuantity += item.quantity;
+    }
+
+    if (validQuantity < minQuantity) return 0;
+
+    const percentage = Math.min(value, 100);
+    return Math.round(subtotal * (percentage / 100) * 100) / 100;
+  }
+}
+
+export class CouponExpirationDiscountStrategy implements DiscountStrategy {
+  type = 'coupon_expiration';
+
+  calculateDiscount(subtotal: number, _items: CartItem[], discount: Discount | DiscountRule): number {
+    if (!discount.expiresAt) return 0;
+
+    const expirationTime = new Date(discount.expiresAt).getTime();
+    if (isNaN(expirationTime)) return 0;
+
+    const now = Date.now();
+    if (expirationTime <= now) {
+      return 0;
+    }
+
+    const value = ('amount' in discount && discount.amount !== undefined)
+      ? discount.amount
+      : (discount.value ?? discount.amount ?? 0);
+    if (value <= 0) return 0;
+
+    return Math.min(value, subtotal);
+  }
+}
+
+export class DiscountStrategyRegistry {
+  private strategies = new Map<string, DiscountStrategy>();
+
+  constructor() {
+    const fixedStrategy = new FixedAmountDiscountStrategy();
+    this.register(new PercentageDiscountStrategy());
+    this.register(fixedStrategy);
+    this.strategies.set('fixed_amount', fixedStrategy);
+    this.register(new BulkDiscountStrategy());
+    this.register(new CouponExpirationDiscountStrategy());
+  }
+
+  register(strategy: DiscountStrategy): void {
+    this.strategies.set(strategy.type, strategy);
+  }
+
+  get(type: string): DiscountStrategy | undefined {
+    return this.strategies.get(type);
+  }
+}
 
 export class CartService {
   private items: CartItem[] = [];
-  private appliedDiscounts: Discount[] = [];
+  private discounts: (Discount | DiscountRule)[] = [];
+  private registry: DiscountStrategyRegistry;
 
-  /**
-   * Add an item to the cart
-   */
-  addItem(item: CartItem): CartOperationResult<CartSummary> {
-    if (!item.id || item.id.trim() === '') {
-      return { success: false, error: 'Item ID is required' };
-    }
+  constructor(registry?: DiscountStrategyRegistry) {
+    this.registry = registry ?? new DiscountStrategyRegistry();
+  }
 
-    if (item.price < 0) {
-      return { success: false, error: 'Item price cannot be negative' };
-    }
+  addItem(item: CartItem): void {
+    if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') return;
+    if (!isFinite(item.price) || !isFinite(item.quantity)) return;
+    if (item.price < 0 || item.quantity <= 0 || !Number.isInteger(item.quantity)) return;
 
-    if (item.quantity <= 0 || !Number.isInteger(item.quantity)) {
-      return { success: false, error: 'Quantity must be a positive integer' };
-    }
-
-    const existingIndex = this.items.findIndex((i) => i.id === item.id);
-    if (existingIndex >= 0) {
+    const existingIndex = this.items.findIndex(i => i.id === item.id);
+    if (existingIndex > -1) {
       this.items[existingIndex].quantity += item.quantity;
     } else {
       this.items.push({ ...item });
     }
-
-    return { success: true, data: this.getSummary() };
   }
 
-  /**
-   * Remove an item from the cart by ID
-   */
-  removeItem(itemId: string): CartOperationResult<CartSummary> {
-    const initialLength = this.items.length;
-    this.items = this.items.filter((item) => item.id !== itemId);
-
-    if (this.items.length === initialLength) {
-      return { success: false, error: `Item with ID "${itemId}" not found` };
-    }
-
-    return { success: true, data: this.getSummary() };
+  removeItem(itemId: string): void {
+    this.items = this.items.filter(item => item.id !== itemId);
   }
 
-  /**
-   * Update item quantity
-   */
-  updateQuantity(itemId: string, quantity: number): CartOperationResult<CartSummary> {
-    if (quantity <= 0 || !Number.isInteger(quantity)) {
-      return { success: false, error: 'Quantity must be a positive integer' };
+  updateQuantity(itemId: string, quantity: number): void {
+    if (typeof quantity !== 'number' || !isFinite(quantity)) {
+      return;
     }
-
-    const item = this.items.find((i) => i.id === itemId);
-    if (!item) {
-      return { success: false, error: `Item with ID "${itemId}" not found` };
+    if (quantity === 0) {
+      this.removeItem(itemId);
+      return;
     }
-
-    item.quantity = quantity;
-    return { success: true, data: this.getSummary() };
+    if (quantity < 0 || !Number.isInteger(quantity)) {
+      return;
+    }
+    const item = this.items.find(i => i.id === itemId);
+    if (item) {
+      item.quantity = quantity;
+    }
   }
 
-  /**
-   * Apply a discount code/rule to the cart
-   */
-  applyDiscount(discount: Discount): CartOperationResult<CartSummary> {
-    if (!discount.code || discount.code.trim() === '') {
-      return { success: false, error: 'Discount code is required' };
+  applyDiscount(discount: Discount | DiscountRule): void {
+    if (!discount || typeof discount.type !== 'string') return;
+    const discountCopy = JSON.parse(JSON.stringify(discount)) as Discount | DiscountRule;
+    if (!discountCopy.id) {
+      discountCopy.id = `disc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     }
-
-    if (discount.value <= 0) {
-      return { success: false, error: 'Discount value must be greater than zero' };
-    }
-
-    if (discount.type === 'percentage' && discount.value > 100) {
-      return { success: false, error: 'Percentage discount cannot exceed 100%' };
-    }
-
-    // Check if discount already applied
-    const alreadyApplied = this.appliedDiscounts.some((d) => d.code === discount.code);
-    if (alreadyApplied) {
-      return { success: false, error: `Discount code "${discount.code}" has already been applied` };
-    }
-
-    this.appliedDiscounts.push({ ...discount });
-    return { success: true, data: this.getSummary() };
+    this.discounts.push(discountCopy);
   }
 
-  /**
-   * Remove a discount by code
-   */
-  removeDiscount(code: string): CartOperationResult<CartSummary> {
-    const initialLength = this.appliedDiscounts.length;
-    this.appliedDiscounts = this.appliedDiscounts.filter((d) => d.code !== code);
-
-    if (this.appliedDiscounts.length === initialLength) {
-      return { success: false, error: `Discount code "${code}" not found` };
-    }
-
-    return { success: true, data: this.getSummary() };
+  removeDiscount(discountId: string): void {
+    this.discounts = this.discounts.filter(d => d.id !== discountId);
   }
 
-  /**
-   * Calculate subtotal (sum of item prices * quantities)
-   */
-  calculateSubtotal(): number {
-    const subtotal = this.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  clear(): void {
+    this.items = [];
+    this.discounts = [];
+  }
+
+  calculateSubtotal(items?: CartItem[]): number {
+    const targetItems = items ?? this.items;
+    if (!Array.isArray(targetItems)) return 0;
+
+    let subtotal = 0;
+    for (const item of targetItems) {
+      if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') continue;
+      if (!isFinite(item.price) || !isFinite(item.quantity)) continue;
+      if (item.price < 0 || item.quantity <= 0) continue;
+      subtotal += item.price * item.quantity;
+    }
     return Math.round(subtotal * 100) / 100;
   }
 
-  /**
-   * Calculate applied discounts against subtotal
-   */
-  calculateDiscounts(subtotal: number, discounts: Discount[]): DiscountResult {
-    let currentSubtotal = subtotal;
-    let totalSavings = 0;
-    const applied: AppliedDiscount[] = [];
+  calculateDiscount(items?: CartItem[], rules?: (Discount | DiscountRule)[]): number {
+    const targetItems = items ?? this.items;
+    const targetRules = rules ?? this.discounts;
 
-    for (const discount of discounts) {
-      let discountAmount = 0;
+    const initialSubtotal = this.calculateSubtotal(targetItems);
+    if (initialSubtotal <= 0 || !Array.isArray(targetRules)) return 0;
 
-      switch (discount.type) {
-        case 'fixed': {
-          discountAmount = discount.value;
-          break;
+    let remainingSubtotal = initialSubtotal;
+    let totalDiscount = 0;
+
+    for (const rule of targetRules) {
+      if (!rule || typeof rule.type !== 'string') continue;
+      const strategy = this.registry.get(rule.type);
+      if (strategy) {
+        const discountAmount = strategy.calculateDiscount(remainingSubtotal, targetItems, rule);
+        if (typeof discountAmount === 'number' && isFinite(discountAmount) && discountAmount > 0) {
+          const actualDiscount = Math.min(discountAmount, remainingSubtotal);
+          totalDiscount += actualDiscount;
+          remainingSubtotal -= actualDiscount;
         }
-        case 'percentage': {
-          discountAmount = (currentSubtotal * discount.value) / 100;
-          break;
-        }
-        case 'buy_x_get_y': {
-          // BOGO discount logic calculated separately per item
-          if (discount.targetItemId) {
-            const item = this.items.find((i) => i.id === discount.targetItemId);
-            if (item && discount.requiredQuantity && discount.freeQuantity) {
-              const sets = Math.floor(item.quantity / discount.requiredQuantity);
-              discountAmount = sets * discount.freeQuantity * item.price;
-            }
-          }
-          break;
-        }
-      }
-
-      // Ensure single discount doesn't exceed current subtotal
-      discountAmount = Math.min(discountAmount, currentSubtotal);
-      discountAmount = Math.round(discountAmount * 100) / 100;
-
-      if (discountAmount > 0) {
-        applied.push({
-          code: discount.code,
-          type: discount.type,
-          amountSaved: discountAmount,
-        });
-
-        currentSubtotal -= discountAmount;
-        totalSavings += discountAmount;
       }
     }
 
-    const finalTotal = Math.max(0, Math.round((subtotal - totalSavings) * 100) / 100);
+    return Math.round(Math.min(totalDiscount, initialSubtotal) * 100) / 100;
+  }
+
+  calculateTotal(items?: CartItem[], rules?: (Discount | DiscountRule)[]): {
+    subtotal: number;
+    discount: number;
+    total: number;
+  } {
+    const targetItems = items ?? this.items;
+    const targetRules = rules ?? this.discounts;
+
+    const subtotal = this.calculateSubtotal(targetItems);
+    const discount = this.calculateDiscount(targetItems, targetRules);
+    const total = Math.max(0, subtotal - discount);
 
     return {
-      subtotal,
-      totalSavings: Math.round(totalSavings * 100) / 100,
-      finalTotal,
-      appliedDiscounts: applied,
+      subtotal: Math.round(subtotal * 100) / 100,
+      discount: Math.round(discount * 100) / 100,
+      total: Math.round(total * 100) / 100,
     };
   }
 
-  /**
-   * Get complete summary of current cart state
-   */
   getSummary(): CartSummary {
-    const subtotal = this.calculateSubtotal();
-    const discountResult = this.calculateDiscounts(subtotal, this.appliedDiscounts);
-    const itemCount = this.items.reduce((sum, item) => sum + item.quantity, 0);
-
+    const result = this.calculateTotal();
+    const appliedDiscounts = JSON.parse(JSON.stringify(this.discounts)) as (Discount | DiscountRule)[];
+    const itemsCopy = JSON.parse(JSON.stringify(this.items)) as CartItem[];
     return {
-      items: [...this.items],
-      itemCount,
-      subtotal,
-      totalSavings: discountResult.totalSavings,
-      finalTotal: discountResult.finalTotal,
-      appliedDiscounts: discountResult.appliedDiscounts,
+      items: itemsCopy,
+      subtotal: result.subtotal,
+      discount: result.discount,
+      total: result.total,
+      appliedDiscounts,
     };
-  }
-
-  /**
-   * Clear all items and discounts
-   */
-  clear(): void {
-    this.items = [];
-    this.appliedDiscounts = [];
   }
 }
+
+export const calculateCartSubtotal = (items: CartItem[]): number => {
+  return new CartService().calculateSubtotal(items);
+};
+
+export const calculateCartDiscount = (items: CartItem[], rules: (Discount | DiscountRule)[]): number => {
+  return new CartService().calculateDiscount(items, rules);
+};
+
+export const calculateCartTotal = (items: CartItem[], rules?: (Discount | DiscountRule)[]): {
+  subtotal: number;
+  discount: number;
+  total: number;
+} => {
+  return new CartService().calculateTotal(items, rules);
+};
+
+export class ShoppingCart extends CartService {}
