@@ -35,28 +35,28 @@ var Validator = /** @class */ (function () {
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
             return {
                 isValid: false,
-                message: fieldName + " is required and cannot be empty."
+                errors: [fieldName + " is required and cannot be empty."]
             };
         }
-        return { isValid: true };
+        return { isValid: true, errors: [] };
     };
     Validator.validatePositiveNumber = function (value, fieldName) {
         if (typeof value !== 'number' || isNaN(value) || value <= 0) {
             return {
                 isValid: false,
-                message: fieldName + " must be a positive number."
+                errors: [fieldName + " must be a positive number."]
             };
         }
-        return { isValid: true };
+        return { isValid: true, errors: [] };
     };
     Validator.validatePercentage = function (value, fieldName) {
         if (typeof value !== 'number' || isNaN(value) || value < 0 || value > 100) {
             return {
                 isValid: false,
-                message: fieldName + " must be a number between 0 and 100."
+                errors: [fieldName + " must be a number between 0 and 100."]
             };
         }
-        return { isValid: true };
+        return { isValid: true, errors: [] };
     };
     return Validator;
 }());

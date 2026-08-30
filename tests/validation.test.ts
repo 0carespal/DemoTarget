@@ -66,20 +66,41 @@ describe('Validation Unit Tests', () => {
 
   describe('Validator Utility Class', () => {
     it('should validate non-empty strings', () => {
-      expect(Validator.validateNonEmptyString('Hello', 'Field').isValid).toBe(true);
-      expect(Validator.validateNonEmptyString('  ', 'Field').isValid).toBe(false);
+      const valid = Validator.validateNonEmptyString('Hello', 'Field');
+      expect(valid.isValid).toBe(true);
+      expect(valid.errors).toEqual([]);
+
+      const invalid = Validator.validateNonEmptyString('  ', 'Field');
+      expect(invalid.isValid).toBe(false);
+      expect(invalid.errors).toEqual(['Field is required and cannot be empty.']);
     });
 
     it('should validate positive numbers', () => {
-      expect(Validator.validatePositiveNumber(10, 'Field').isValid).toBe(true);
-      expect(Validator.validatePositiveNumber(0, 'Field').isValid).toBe(false);
-      expect(Validator.validatePositiveNumber(-5, 'Field').isValid).toBe(false);
+      const valid = Validator.validatePositiveNumber(10, 'Field');
+      expect(valid.isValid).toBe(true);
+      expect(valid.errors).toEqual([]);
+
+      const invalid = Validator.validatePositiveNumber(0, 'Field');
+      expect(invalid.isValid).toBe(false);
+      expect(invalid.errors).toEqual(['Field must be a positive number.']);
+
+      const negative = Validator.validatePositiveNumber(-5, 'Field');
+      expect(negative.isValid).toBe(false);
+      expect(negative.errors).toEqual(['Field must be a positive number.']);
     });
 
     it('should validate percentages', () => {
-      expect(Validator.validatePercentage(50, 'Field').isValid).toBe(true);
-      expect(Validator.validatePercentage(-1, 'Field').isValid).toBe(false);
-      expect(Validator.validatePercentage(101, 'Field').isValid).toBe(false);
+      const valid = Validator.validatePercentage(50, 'Field');
+      expect(valid.isValid).toBe(true);
+      expect(valid.errors).toEqual([]);
+
+      const low = Validator.validatePercentage(-1, 'Field');
+      expect(low.isValid).toBe(false);
+      expect(low.errors).toEqual(['Field must be a number between 0 and 100.']);
+
+      const high = Validator.validatePercentage(101, 'Field');
+      expect(high.isValid).toBe(false);
+      expect(high.errors).toEqual(['Field must be a number between 0 and 100.']);
     });
   });
 
