@@ -44,7 +44,7 @@ export interface CartSummary {
     subtotal: number;
     discount: number;
     total: number;
-    appliedDiscounts: Discount[];
+    appliedDiscounts: (Discount | DiscountRule)[];
 }
 export interface DiscountStrategy {
     type: string;

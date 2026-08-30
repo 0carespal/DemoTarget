@@ -1,15 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CartService = exports.DiscountStrategyRegistry = exports.CouponExpirationDiscountStrategy = exports.BulkDiscountStrategy = exports.FixedAmountDiscountStrategy = exports.PercentageDiscountStrategy = void 0;
+exports.ShoppingCart = exports.calculateCartTotal = exports.calculateCartDiscount = exports.calculateCartSubtotal = exports.CartService = exports.DiscountStrategyRegistry = exports.CouponExpirationDiscountStrategy = exports.BulkDiscountStrategy = exports.FixedAmountDiscountStrategy = exports.PercentageDiscountStrategy = void 0;
 class PercentageDiscountStrategy {
     constructor() {
         this.type = 'percentage';
     }
     calculateDiscount(subtotal, _items, discount) {
-        var _a, _b;
         const value = ('percentage' in discount && discount.percentage !== undefined)
             ? discount.percentage
-            : ((_b = (_a = discount.value) !== null && _a !== void 0 ? _a : discount.percentage) !== null && _b !== void 0 ? _b : 0);
+            : (discount.value ?? discount.percentage ?? 0);
         if (value <= 0)
             return 0;
         const percentage = Math.min(value, 100);
@@ -22,10 +21,9 @@ class FixedAmountDiscountStrategy {
         this.type = 'fixed';
     }
     calculateDiscount(subtotal, _items, discount) {
-        var _a, _b;
         const value = ('amount' in discount && discount.amount !== undefined)
             ? discount.amount
-            : ((_b = (_a = discount.value) !== null && _a !== void 0 ? _a : discount.amount) !== null && _b !== void 0 ? _b : 0);
+            : (discount.value ?? discount.amount ?? 0);
         if (value <= 0)
             return 0;
         return Math.min(value, subtotal);
@@ -37,15 +35,23 @@ class BulkDiscountStrategy {
         this.type = 'bulk';
     }
     calculateDiscount(subtotal, items, discount) {
-        var _a, _b, _c;
-        const minQuantity = (_a = discount.minQuantity) !== null && _a !== void 0 ? _a : 1;
+        const minQuantity = discount.minQuantity ?? 1;
         const value = ('discountPercentage' in discount && discount.discountPercentage !== undefined)
             ? discount.discountPercentage
-            : ((_c = (_b = discount.value) !== null && _b !== void 0 ? _b : discount.discountPercentage) !== null && _c !== void 0 ? _c : 0);
+            : (discount.value ?? discount.discountPercentage ?? 0);
         if (value <= 0)
             return 0;
-        const totalQuantity = items.reduce((sum, item) => sum + (item.quantity > 0 ? item.quantity : 0), 0);
-        if (totalQuantity < minQuantity)
+        let validQuantity = 0;
+        for (const item of items) {
+            if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number')
+                continue;
+            if (!isFinite(item.price) || !isFinite(item.quantity))
+                continue;
+            if (item.price < 0 || item.quantity <= 0)
+                continue;
+            validQuantity += item.quantity;
+        }
+        if (validQuantity < minQuantity)
             return 0;
         const percentage = Math.min(value, 100);
         return Math.round(subtotal * (percentage / 100) * 100) / 100;
@@ -57,7 +63,6 @@ class CouponExpirationDiscountStrategy {
         this.type = 'coupon_expiration';
     }
     calculateDiscount(subtotal, _items, discount) {
-        var _a, _b, _c;
         if (!discount.expiresAt)
             return 0;
         const expirationTime = new Date(discount.expiresAt).getTime();
@@ -69,7 +74,7 @@ class CouponExpirationDiscountStrategy {
         }
         const value = ('amount' in discount && discount.amount !== undefined)
             ? discount.amount
-            : ((_c = (_b = discount.value) !== null && _b !== void 0 ? _b : discount.amount) !== null && _c !== void 0 ? _c : 0);
+            : (discount.value ?? discount.amount ?? 0);
         if (value <= 0)
             return 0;
         return Math.min(value, subtotal);
@@ -98,7 +103,7 @@ class CartService {
     constructor(registry) {
         this.items = [];
         this.discounts = [];
-        this.registry = registry !== null && registry !== void 0 ? registry : new DiscountStrategyRegistry();
+        this.registry = registry ?? new DiscountStrategyRegistry();
     }
     addItem(item) {
         if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number')
@@ -112,15 +117,21 @@ class CartService {
             this.items[existingIndex].quantity += item.quantity;
         }
         else {
-            this.items.push(Object.assign({}, item));
+            this.items.push({ ...item });
         }
     }
     removeItem(itemId) {
         this.items = this.items.filter(item => item.id !== itemId);
     }
     updateQuantity(itemId, quantity) {
-        if (typeof quantity !== 'number' || !isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+        if (typeof quantity !== 'number' || !isFinite(quantity)) {
+            return;
+        }
+        if (quantity === 0) {
             this.removeItem(itemId);
+            return;
+        }
+        if (quantity < 0 || !Number.isInteger(quantity)) {
             return;
         }
         const item = this.items.find(i => i.id === itemId);
@@ -145,7 +156,7 @@ class CartService {
         this.discounts = [];
     }
     calculateSubtotal(items) {
-        const targetItems = items !== null && items !== void 0 ? items : this.items;
+        const targetItems = items ?? this.items;
         if (!Array.isArray(targetItems))
             return 0;
         let subtotal = 0;
@@ -161,8 +172,8 @@ class CartService {
         return Math.round(subtotal * 100) / 100;
     }
     calculateDiscount(items, rules) {
-        const targetItems = items !== null && items !== void 0 ? items : this.items;
-        const targetRules = rules !== null && rules !== void 0 ? rules : this.discounts;
+        const targetItems = items ?? this.items;
+        const targetRules = rules ?? this.discounts;
         const initialSubtotal = this.calculateSubtotal(targetItems);
         if (initialSubtotal <= 0 || !Array.isArray(targetRules))
             return 0;
@@ -184,8 +195,8 @@ class CartService {
         return Math.round(Math.min(totalDiscount, initialSubtotal) * 100) / 100;
     }
     calculateTotal(items, rules) {
-        const targetItems = items !== null && items !== void 0 ? items : this.items;
-        const targetRules = rules !== null && rules !== void 0 ? rules : this.discounts;
+        const targetItems = items ?? this.items;
+        const targetRules = rules ?? this.discounts;
         const subtotal = this.calculateSubtotal(targetItems);
         const discount = this.calculateDiscount(targetItems, targetRules);
         const total = Math.max(0, subtotal - discount);
@@ -209,3 +220,18 @@ class CartService {
     }
 }
 exports.CartService = CartService;
+const calculateCartSubtotal = (items) => {
+    return new CartService().calculateSubtotal(items);
+};
+exports.calculateCartSubtotal = calculateCartSubtotal;
+const calculateCartDiscount = (items, rules) => {
+    return new CartService().calculateDiscount(items, rules);
+};
+exports.calculateCartDiscount = calculateCartDiscount;
+const calculateCartTotal = (items, rules) => {
+    return new CartService().calculateTotal(items, rules);
+};
+exports.calculateCartTotal = calculateCartTotal;
+class ShoppingCart extends CartService {
+}
+exports.ShoppingCart = ShoppingCart;

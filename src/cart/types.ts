@@ -37,7 +37,6 @@ export interface CouponExpirationDiscount extends BaseDiscount {
 
 export type Discount = PercentageDiscount | FixedDiscount | BulkDiscount | CouponExpirationDiscount;
 
-// For strategy calculations where a rule object can represent any discount variant
 export interface DiscountRule {
   id?: string;
   type: string;
@@ -54,7 +53,7 @@ export interface CartSummary {
   subtotal: number;
   discount: number;
   total: number;
-  appliedDiscounts: Discount[];
+  appliedDiscounts: (Discount | DiscountRule)[];
 }
 
 export interface DiscountStrategy {

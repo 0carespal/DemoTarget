@@ -35,8 +35,15 @@ export class BulkDiscountStrategy implements DiscountStrategy {
       : (discount.value ?? discount.discountPercentage ?? 0);
     if (value <= 0) return 0;
 
-    const totalQuantity = items.reduce((sum, item) => sum + (item.quantity > 0 ? item.quantity : 0), 0);
-    if (totalQuantity < minQuantity) return 0;
+    let validQuantity = 0;
+    for (const item of items) {
+      if (!item || typeof item.price !== 'number' || typeof item.quantity !== 'number') continue;
+      if (!isFinite(item.price) || !isFinite(item.quantity)) continue;
+      if (item.price < 0 || item.quantity <= 0) continue;
+      validQuantity += item.quantity;
+    }
+
+    if (validQuantity < minQuantity) return 0;
 
     const percentage = Math.min(value, 100);
     return Math.round(subtotal * (percentage / 100) * 100) / 100;
@@ -73,7 +80,6 @@ export class DiscountStrategyRegistry {
     const fixedStrategy = new FixedAmountDiscountStrategy();
     this.register(new PercentageDiscountStrategy());
     this.register(fixedStrategy);
-    // Register alias for 'fixed_amount' for backwards compatibility
     this.strategies.set('fixed_amount', fixedStrategy);
     this.register(new BulkDiscountStrategy());
     this.register(new CouponExpirationDiscountStrategy());
@@ -115,8 +121,14 @@ export class CartService {
   }
 
   updateQuantity(itemId: string, quantity: number): void {
-    if (typeof quantity !== 'number' || !isFinite(quantity) || quantity <= 0 || !Number.isInteger(quantity)) {
+    if (typeof quantity !== 'number' || !isFinite(quantity)) {
+      return;
+    }
+    if (quantity === 0) {
       this.removeItem(itemId);
+      return;
+    }
+    if (quantity < 0 || !Number.isInteger(quantity)) {
       return;
     }
     const item = this.items.find(i => i.id === itemId);
@@ -204,7 +216,7 @@ export class CartService {
 
   getSummary(): CartSummary {
     const result = this.calculateTotal();
-    const appliedDiscounts = JSON.parse(JSON.stringify(this.discounts)) as Discount[];
+    const appliedDiscounts = JSON.parse(JSON.stringify(this.discounts)) as (Discount | DiscountRule)[];
     const itemsCopy = JSON.parse(JSON.stringify(this.items)) as CartItem[];
     return {
       items: itemsCopy,
@@ -215,3 +227,21 @@ export class CartService {
     };
   }
 }
+
+export const calculateCartSubtotal = (items: CartItem[]): number => {
+  return new CartService().calculateSubtotal(items);
+};
+
+export const calculateCartDiscount = (items: CartItem[], rules: (Discount | DiscountRule)[]): number => {
+  return new CartService().calculateDiscount(items, rules);
+};
+
+export const calculateCartTotal = (items: CartItem[], rules?: (Discount | DiscountRule)[]): {
+  subtotal: number;
+  discount: number;
+  total: number;
+} => {
+  return new CartService().calculateTotal(items, rules);
+};
+
+export class ShoppingCart extends CartService {}

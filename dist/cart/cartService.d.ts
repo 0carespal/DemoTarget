@@ -1,5 +1,4 @@
 import { CartItem, Discount, DiscountRule, CartSummary, DiscountStrategy } from './types';
-
 export declare class PercentageDiscountStrategy implements DiscountStrategy {
     type: string;
     calculateDiscount(subtotal: number, _items: CartItem[], discount: Discount | DiscountRule): number;
@@ -41,4 +40,13 @@ export declare class CartService {
         total: number;
     };
     getSummary(): CartSummary;
+}
+export declare const calculateCartSubtotal: (items: CartItem[]) => number;
+export declare const calculateCartDiscount: (items: CartItem[], rules: (Discount | DiscountRule)[]) => number;
+export declare const calculateCartTotal: (items: CartItem[], rules?: (Discount | DiscountRule)[]) => {
+    subtotal: number;
+    discount: number;
+    total: number;
+};
+export declare class ShoppingCart extends CartService {
 }
