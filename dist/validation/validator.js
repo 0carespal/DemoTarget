@@ -1,63 +1,60 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Validator = exports.sanitizeInput = exports.isValidPassword = exports.isValidEmail = void 0;
+exports.Validator = void 0;
+exports.isValidEmail = isValidEmail;
+exports.isValidPassword = isValidPassword;
+exports.sanitizeInput = sanitizeInput;
 function isValidEmail(email) {
     if (typeof email !== 'string')
         return false;
-    var trimmed = email.trim();
+    const trimmed = email.trim();
     if (!trimmed)
         return false;
-    var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     return emailRegex.test(trimmed);
 }
-exports.isValidEmail = isValidEmail;
 function isValidPassword(password) {
     if (typeof password !== 'string')
         return false;
     if (password.length < 8)
         return false;
-    var hasUppercase = /[A-Z]/.test(password);
-    var hasNumber = /[0-9]/.test(password);
-    var hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
     return hasUppercase && hasNumber && hasSpecialChar;
 }
-exports.isValidPassword = isValidPassword;
 function sanitizeInput(input) {
     if (typeof input !== 'string')
         return '';
     return input.replace(/<[^>]*>/g, '').trim();
 }
-exports.sanitizeInput = sanitizeInput;
-var Validator = /** @class */ (function () {
-    function Validator() {
-    }
-    Validator.validateNonEmptyString = function (value, fieldName) {
+class Validator {
+    static validateNonEmptyString(value, fieldName) {
         if (!value || typeof value !== 'string' || value.trim().length === 0) {
             return {
                 isValid: false,
-                errors: [fieldName + " is required and cannot be empty."]
+                errors: [`${fieldName} is required and cannot be empty.`]
             };
         }
         return { isValid: true, errors: [] };
-    };
-    Validator.validatePositiveNumber = function (value, fieldName) {
+    }
+    static validatePositiveNumber(value, fieldName) {
         if (typeof value !== 'number' || isNaN(value) || value <= 0) {
             return {
                 isValid: false,
-                errors: [fieldName + " must be a positive number."]
+                errors: [`${fieldName} must be a positive number.`]
             };
         }
         return { isValid: true, errors: [] };
-    };
-    Validator.validatePercentage = function (value, fieldName) {
+    }
+    static validatePercentage(value, fieldName) {
         if (typeof value !== 'number' || isNaN(value) || value < 0 || value > 100) {
             return {
                 isValid: false,
-                errors: [fieldName + " must be a number between 0 and 100."]
+                errors: [`${fieldName} must be a number between 0 and 100.`]
             };
         }
         return { isValid: true, errors: [] };
-    };
-    return Validator;
-}());
+    }
+}
 exports.Validator = Validator;
