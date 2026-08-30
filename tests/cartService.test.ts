@@ -1,132 +1,111 @@
-import { CartService } from '../src/cart/cartService';
+import { CartService, DiscountStrategyRegistry, CouponExpirationDiscountStrategy } from '../src/cart/cartService';
+import { CartItem, DiscountRule } from '../src/cart/types';
 
 describe('CartService', () => {
   let cartService: CartService;
+
+  const sampleItems: CartItem[] = [
+    { id: '1', name: 'Widget', price: 10.0, quantity: 2 },
+    { id: '2', name: 'Gadget', price: 20.0, quantity: 1 },
+  ]; // Subtotal = 40.00
 
   beforeEach(() => {
     cartService = new CartService();
   });
 
-  describe('addItem', () => {
-    it('should add an item to the cart', () => {
-      const result = cartService.addItem({ id: 'item-1', name: 'Widget', price: 10, quantity: 2 });
-      expect(result.success).toBe(true);
-      expect(result.data?.itemCount).toBe(2);
-      expect(result.data?.subtotal).toBe(20);
+  describe('calculateSubtotal', () => {
+    it('should calculate the correct subtotal for cart items', () => {
+      const subtotal = cartService.calculateSubtotal(sampleItems);
+      expect(subtotal).toBe(40.0);
     });
 
-    it('should update quantity if item already exists', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 10, quantity: 2 });
-      const result = cartService.addItem({ id: 'item-1', name: 'Widget', price: 10, quantity: 3 });
-      expect(result.success).toBe(true);
-      expect(result.data?.itemCount).toBe(5);
-      expect(result.data?.subtotal).toBe(50);
-    });
-
-    it('should reject invalid items', () => {
-      const result = cartService.addItem({ id: '', name: 'Invalid', price: 10, quantity: 1 });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Item ID is required');
-    });
-
-    it('should reject negative prices', () => {
-      const result = cartService.addItem({ id: 'item-1', name: 'Free', price: -5, quantity: 1 });
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('price cannot be negative');
+    it('should return 0 for an empty cart', () => {
+      expect(cartService.calculateSubtotal([])).toBe(0);
     });
   });
 
-  describe('applyDiscount', () => {
-    it('should apply a percentage discount', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 100, quantity: 1 });
-      const result = cartService.applyDiscount({
-        code: 'SAVE10',
-        type: 'percentage',
-        value: 10,
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data?.subtotal).toBe(100);
-      expect(result.data?.totalSavings).toBe(10);
-      expect(result.data?.finalTotal).toBe(90);
+  describe('calculateDiscount', () => {
+    it('should apply percentage discount correctly', () => {
+      const rules: DiscountRule[] = [{ type: 'percentage', value: 10 }];
+      const discount = cartService.calculateDiscount(sampleItems, rules);
+      expect(discount).toBe(4.0);
     });
 
-    it('should compound multiple percentage discounts sequentially', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 100, quantity: 1 });
-      cartService.applyDiscount({
-        code: 'HALF1',
-        type: 'percentage',
-        value: 50,
-      });
-      const result = cartService.applyDiscount({
-        code: 'HALF2',
-        type: 'percentage',
-        value: 50,
-      });
-
-      expect(result.success).toBe(true);
-      expect(result.data?.subtotal).toBe(100);
-      expect(result.data?.totalSavings).toBe(75);
-      expect(result.data?.finalTotal).toBe(25);
+    it('should apply fixed amount discount correctly', () => {
+      const rules: DiscountRule[] = [{ type: 'fixed_amount', value: 5 }];
+      const discount = cartService.calculateDiscount(sampleItems, rules);
+      expect(discount).toBe(5.0);
     });
 
-    it('should compound three percentage discounts sequentially', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 100, quantity: 1 });
-      cartService.applyDiscount({ code: 'DISC20', type: 'percentage', value: 20 }); // $100 -> $80
-      cartService.applyDiscount({ code: 'DISC10', type: 'percentage', value: 10 }); // $80 -> $72
-      const result = cartService.applyDiscount({ code: 'DISC50', type: 'percentage', value: 50 }); // $72 -> $36
-
-      expect(result.success).toBe(true);
-      expect(result.data?.subtotal).toBe(100);
-      expect(result.data?.totalSavings).toBe(64);
-      expect(result.data?.finalTotal).toBe(36);
+    it('should apply bulk discount when minQuantity is met', () => {
+      const rules: DiscountRule[] = [{ type: 'bulk', minQuantity: 3, value: 15 }];
+      const discount = cartService.calculateDiscount(sampleItems, rules);
+      expect(discount).toBe(6.0);
     });
 
-    it('should ensure total never drops below $0.00', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 100, quantity: 1 });
-      cartService.applyDiscount({ code: 'FLAT150', type: 'fixed', value: 150 });
-      const summary = cartService.getSummary();
-
-      expect(summary.totalSavings).toBe(100);
-      expect(summary.finalTotal).toBe(0);
+    it('should not apply bulk discount when minQuantity is not met', () => {
+      const rules: DiscountRule[] = [{ type: 'bulk', minQuantity: 5, value: 15 }];
+      const discount = cartService.calculateDiscount(sampleItems, rules);
+      expect(discount).toBe(0);
     });
 
-    it('should reject duplicate discount codes', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 100, quantity: 1 });
-      cartService.applyDiscount({ code: 'SAVE10', type: 'percentage', value: 10 });
-      const result = cartService.applyDiscount({
-        code: 'SAVE10',
-        type: 'percentage',
-        value: 10,
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('already been applied');
-    });
-
-    it('should reject invalid discount values', () => {
-      const result = cartService.applyDiscount({
-        code: 'INVALID',
-        type: 'percentage',
-        value: 150,
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('cannot exceed 100%');
+    it('should cap total discount at subtotal', () => {
+      const rules: DiscountRule[] = [{ type: 'fixed_amount', value: 100 }];
+      const discount = cartService.calculateDiscount(sampleItems, rules);
+      expect(discount).toBe(40.0);
     });
   });
 
-  describe('clear', () => {
-    it('should reset cart completely', () => {
-      cartService.addItem({ id: 'item-1', name: 'Widget', price: 10, quantity: 1 });
-      cartService.applyDiscount({ code: 'SAVE10', type: 'percentage', value: 10 });
-      cartService.clear();
+  describe('CouponExpirationDiscountStrategy', () => {
+    it('should apply active coupon discount when expiresAt is in the future', () => {
+      const futureDate = new Date(Date.now() + 86400000).toISOString(); // +1 day
+      const rules: DiscountRule[] = [
+        { type: 'coupon_expiration', value: 10, expiresAt: futureDate },
+      ];
+      const result = cartService.calculateTotal(sampleItems, rules);
+      expect(result.discount).toBe(10.0);
+      expect(result.total).toBe(30.0);
+    });
 
-      const summary = cartService.getSummary();
-      expect(summary.items).toHaveLength(0);
-      expect(summary.itemCount).toBe(0);
-      expect(summary.subtotal).toBe(0);
-      expect(summary.appliedDiscounts).toHaveLength(0);
+    it('should apply $0.00 discount when expiresAt is in the past', () => {
+      const pastDate = new Date(Date.now() - 86400000).toISOString(); // -1 day
+      const rules: DiscountRule[] = [
+        { type: 'coupon_expiration', value: 10, expiresAt: pastDate },
+      ];
+      const result = cartService.calculateTotal(sampleItems, rules);
+      expect(result.discount).toBe(0.0);
+      expect(result.total).toBe(40.0);
+    });
+
+    it('should apply $0.00 discount when expiresAt is missing or invalid', () => {
+      const missingDateRules: DiscountRule[] = [
+        { type: 'coupon_expiration', value: 10 },
+      ];
+      const invalidDateRules: DiscountRule[] = [
+        { type: 'coupon_expiration', value: 10, expiresAt: 'invalid-date' },
+      ];
+
+      expect(cartService.calculateDiscount(sampleItems, missingDateRules)).toBe(0);
+      expect(cartService.calculateDiscount(sampleItems, invalidDateRules)).toBe(0);
+    });
+
+    it('should be registered by default in DiscountStrategyRegistry', () => {
+      const registry = new DiscountStrategyRegistry();
+      const strategy = registry.get('coupon_expiration');
+      expect(strategy).toBeInstanceOf(CouponExpirationDiscountStrategy);
+    });
+  });
+
+  describe('calculateTotal', () => {
+    it('should return correct summary without discounts', () => {
+      const result = cartService.calculateTotal(sampleItems);
+      expect(result).toEqual({ subtotal: 40.0, discount: 0, total: 40.0 });
+    });
+
+    it('should return correct summary with discounts', () => {
+      const rules: DiscountRule[] = [{ type: 'fixed_amount', value: 10 }];
+      const result = cartService.calculateTotal(sampleItems, rules);
+      expect(result).toEqual({ subtotal: 40.0, discount: 10.0, total: 30.0 });
     });
   });
 });
