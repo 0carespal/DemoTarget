@@ -10,7 +10,7 @@ export declare class FixedAmountDiscountStrategy implements DiscountStrategy {
 }
 export declare class BulkDiscountStrategy implements DiscountStrategy {
     type: string;
-    calculateDiscount(_subtotal: number, items: CartItem[], discount: Discount | DiscountRule): number;
+    calculateDiscount(subtotal: number, items: CartItem[], discount: Discount | DiscountRule): number;
 }
 export declare class CouponExpirationDiscountStrategy implements DiscountStrategy {
     type: string;

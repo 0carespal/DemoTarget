@@ -30,6 +30,7 @@ export interface CouponExpirationDiscount extends BaseDiscount {
 }
 export type Discount = PercentageDiscount | FixedDiscount | BulkDiscount | CouponExpirationDiscount;
 export interface DiscountRule {
+    id?: string;
     type: string;
     value?: number;
     amount?: number;

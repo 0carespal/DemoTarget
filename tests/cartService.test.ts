@@ -30,13 +30,39 @@ describe('CartService', () => {
       expect(cartService.calculateSubtotal()).toBe(0);
     });
 
-    it('should apply and remove discounts', () => {
+    it('should reject invalid or negative quantities in addItem and updateQuantity', () => {
+      cartService.addItem({ id: '1', name: 'Widget', price: 10.0, quantity: 2 });
+      cartService.addItem({ id: '1', name: 'Widget', price: 10.0, quantity: -1 }); // ignored
+      expect(cartService.calculateSubtotal()).toBe(20.0);
+
+      cartService.updateQuantity('1', 2.5); // non-integer removes/rejects
+      expect(cartService.calculateSubtotal()).toBe(0);
+    });
+
+    it('should apply and remove discounts (including auto-assigning IDs to id-less rules)', () => {
       const discount: FixedDiscount = { id: 'd1', type: 'fixed', amount: 5 };
       cartService.addItem({ id: '1', name: 'Widget', price: 10.0, quantity: 2 });
       cartService.applyDiscount(discount);
       expect(cartService.getSummary().discount).toBe(5.0);
       cartService.removeDiscount('d1');
       expect(cartService.getSummary().discount).toBe(0.0);
+
+      const idlessRule: DiscountRule = { type: 'fixed', amount: 5 };
+      cartService.applyDiscount(idlessRule);
+      const summary = cartService.getSummary();
+      expect(summary.appliedDiscounts.length).toBe(1);
+      const generatedId = summary.appliedDiscounts[0].id;
+      expect(generatedId).toBeDefined();
+      cartService.removeDiscount(generatedId);
+      expect(cartService.getSummary().discount).toBe(0.0);
+    });
+
+    it('should prevent external mutation of applied discounts', () => {
+      const discount: FixedDiscount = { id: 'd1', type: 'fixed', amount: 5 };
+      cartService.addItem({ id: '1', name: 'Widget', price: 10.0, quantity: 2 });
+      cartService.applyDiscount(discount);
+      discount.amount = 100; // mutate original caller object
+      expect(cartService.getSummary().discount).toBe(5.0);
     });
 
     it('should clear cart items and discounts', () => {
@@ -88,10 +114,18 @@ describe('CartService', () => {
       expect(discount).toBe(5.0);
     });
 
-    it('should apply bulk discount when minQuantity is met', () => {
+    it('should apply bulk discount when minQuantity is met and respect remainingSubtotal', () => {
       const rules: BulkDiscount[] = [{ id: 'b1', type: 'bulk', minQuantity: 3, discountPercentage: 15 }];
       const discount = cartService.calculateDiscount(sampleItems, rules);
       expect(discount).toBe(6.0);
+
+      // Verify bulk discount calculated against remaining subtotal after fixed discount
+      const items: CartItem[] = [{ id: '1', name: 'Item', price: 100, quantity: 1 }];
+      const stackedRules: (DiscountRule | FixedDiscount | BulkDiscount)[] = [
+        { id: 'f1', type: 'fixed', amount: 10 },
+        { id: 'b1', type: 'bulk', minQuantity: 1, discountPercentage: 10 },
+      ];
+      expect(cartService.calculateDiscount(items, stackedRules)).toBe(19.0);
     });
 
     it('should compound sequential percentage discounts correctly', () => {
@@ -102,6 +136,11 @@ describe('CartService', () => {
       const items: CartItem[] = [{ id: '1', name: 'Item', price: 100, quantity: 1 }];
       const discount = cartService.calculateDiscount(items, rules);
       expect(discount).toBe(75.0);
+    });
+
+    it('should handle undefined specialized properties correctly with fallback to value', () => {
+      const rule: DiscountRule = { type: 'fixed', amount: undefined, value: 5 };
+      expect(cartService.calculateDiscount(sampleItems, [rule])).toBe(5.0);
     });
 
     it('should cap total discount at subtotal', () => {

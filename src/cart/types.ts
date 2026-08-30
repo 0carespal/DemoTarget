@@ -39,6 +39,7 @@ export type Discount = PercentageDiscount | FixedDiscount | BulkDiscount | Coupo
 
 // For strategy calculations where a rule object can represent any discount variant
 export interface DiscountRule {
+  id?: string;
   type: string;
   value?: number;
   amount?: number;
