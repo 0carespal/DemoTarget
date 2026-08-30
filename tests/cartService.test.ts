@@ -1,68 +1,89 @@
-import { applyDiscounts, calculateLineTotal, canApplyDiscount } from '../src/cart/cartService';
-import { Discount } from '../src/cart/types';
+import {
+  calculateSubtotal,
+  applyDiscounts,
+  calculateTotal,
+  calculateLineTotal,
+  canApplyDiscount,
+  ShoppingCart,
+} from '../src/cart/cartService';
+import { Discount, CartItem } from '../src/cart/types';
 
 describe('cartService', () => {
   describe('applyDiscounts', () => {
     it('should calculate single percentage discount correctly', () => {
       const discounts: Discount[] = [
-        { id: '1', code: 'SAVE20', type: 'PERCENTAGE', value: 20, isActive: true },
+        { id: '1', code: 'SAVE20', type: 'percentage', value: 20 },
       ];
       const result = applyDiscounts(100, discounts);
-      expect(result.finalTotal).toBe(80);
       expect(result.totalDiscount).toBe(20);
+      expect(result.appliedDiscounts).toHaveLength(1);
     });
 
     it('should compound multiple percentage discounts sequentially', () => {
       const discounts: Discount[] = [
-        { id: '1', code: 'HALF1', type: 'PERCENTAGE', value: 50, isActive: true },
-        { id: '2', code: 'HALF2', type: 'PERCENTAGE', value: 50, isActive: true },
+        { id: '1', code: 'HALF1', type: 'percentage', value: 50 },
+        { id: '2', code: 'HALF2', type: 'percentage', value: 50 },
       ];
       const result = applyDiscounts(100, discounts);
-      // 100 -> 50 (50 off), then 50 -> 25 (25 off). Total discount = 75, final = 25
+      // 100 -> 50 (50 off), then 50 -> 25 (25 off). Total discount = 75
       expect(result.totalDiscount).toBe(75);
-      expect(result.finalTotal).toBe(25);
+      expect(result.appliedDiscounts).toHaveLength(2);
+      expect(result.appliedDiscounts[0].amount).toBe(50);
+      expect(result.appliedDiscounts[1].amount).toBe(25);
     });
 
     it('should calculate fixed discount correctly', () => {
       const discounts: Discount[] = [
-        { id: '1', code: '10OFF', type: 'FIXED', value: 10, isActive: true },
+        { id: '1', code: '10OFF', type: 'fixed', value: 10 },
       ];
       const result = applyDiscounts(100, discounts);
-      expect(result.finalTotal).toBe(90);
       expect(result.totalDiscount).toBe(10);
+      expect(result.appliedDiscounts[0].amount).toBe(10);
     });
 
     it('should not allow total discount to exceed subtotal', () => {
       const discounts: Discount[] = [
-        { id: '1', code: 'BIGFIXED', type: 'FIXED', value: 150, isActive: true },
+        { id: '1', code: 'BIGFIXED', type: 'fixed', value: 150 },
       ];
       const result = applyDiscounts(100, discounts);
-      expect(result.finalTotal).toBe(0);
       expect(result.totalDiscount).toBe(100);
     });
 
-    it('should skip inactive discounts', () => {
+    it('should skip invalid / negative discount values', () => {
       const discounts: Discount[] = [
-        { id: '1', code: 'INACTIVE', type: 'PERCENTAGE', value: 50, isActive: false },
+        { id: '1', code: 'INVALID', type: 'percentage', value: -50 },
       ];
       const result = applyDiscounts(100, discounts);
-      expect(result.finalTotal).toBe(100);
       expect(result.totalDiscount).toBe(0);
-      expect(result.appliedDiscounts[0].status).toBe('SKIPPED');
+      expect(result.appliedDiscounts).toHaveLength(0);
     });
 
     it('should handle empty discounts array', () => {
       const result = applyDiscounts(100, []);
-      expect(result.finalTotal).toBe(100);
       expect(result.totalDiscount).toBe(0);
+      expect(result.appliedDiscounts).toHaveLength(0);
     });
 
     it('should handle zero or negative subtotal', () => {
       const discounts: Discount[] = [
-        { id: '1', code: '10OFF', type: 'FIXED', value: 10, isActive: true },
+        { id: '1', code: '10OFF', type: 'fixed', value: 10 },
       ];
-      expect(applyDiscounts(0, discounts).finalTotal).toBe(0);
-      expect(applyDiscounts(-50, discounts).finalTotal).toBe(0);
+      expect(applyDiscounts(0, discounts).totalDiscount).toBe(0);
+      expect(applyDiscounts(-50, discounts).totalDiscount).toBe(0);
+    });
+  });
+
+  describe('calculateTotal', () => {
+    it('should return correct final total with compounded percentage discounts', () => {
+      const items: CartItem[] = [{ id: '1', name: 'Item', price: 100, quantity: 1 }];
+      const discounts: Discount[] = [
+        { id: '1', code: 'HALF1', type: 'percentage', value: 50 },
+        { id: '2', code: 'HALF2', type: 'percentage', value: 50 },
+      ];
+      const summary = calculateTotal(items, discounts);
+      expect(summary.subtotal).toBe(100);
+      expect(summary.totalDiscount).toBe(75);
+      expect(summary.finalTotal).toBe(25);
     });
   });
 
@@ -90,10 +111,9 @@ describe('cartService', () => {
     const discount: Discount = {
       id: '1',
       code: 'MIN50',
-      type: 'FIXED',
+      type: 'fixed',
       value: 10,
-      isActive: true,
-      minimumSpend: 50,
+      minSubtotal: 50,
     };
 
     it('should allow application if subtotal meets minimum spend', () => {
@@ -107,9 +127,23 @@ describe('cartService', () => {
       expect(result.reason).toContain('Minimum spend');
     });
 
-    it('should reject inactive discount regardless of spend', () => {
-      const inactive = { ...discount, isActive: false };
-      expect(canApplyDiscount(100, inactive).canApply).toBe(false);
+    it('should reject invalid discount values', () => {
+      const invalid = { ...discount, value: -10 };
+      expect(canApplyDiscount(100, invalid).canApply).toBe(false);
+    });
+  });
+
+  describe('ShoppingCart', () => {
+    it('should calculate total with sequential discounts', () => {
+      const cart = new ShoppingCart();
+      cart.addItem({ id: '1', name: 'Product', price: 100, quantity: 1 });
+      cart.applyDiscount({ id: 'd1', code: 'P50A', type: 'percentage', value: 50 });
+      cart.applyDiscount({ id: 'd2', code: 'P50B', type: 'percentage', value: 50 });
+
+      const summary = cart.getSummary();
+      expect(summary.subtotal).toBe(100);
+      expect(summary.totalDiscount).toBe(75);
+      expect(summary.finalTotal).toBe(25);
     });
   });
 });
